@@ -6,9 +6,17 @@ const run = promisify(execFile)
 export const DEFAULT_WARMUP_SECONDS = 1
 export const MAX_WARMUP_SECONDS = 10
 
-// Telegram recompresses photos to ~1280px anyway, so a smaller frame uploads faster from a Pi 2
-const WIDTH = 1600
-const HEIGHT = 1200
+// Picked by comparing test shots of the boiler display: full sensor size, extra sharpness and contrast,
+// and no noise smoothing (it softens the digits)
+const IMAGE_ARGS = [
+  '--mode', '2592:1944',
+  '--width', '2592',
+  '--height', '1944',
+  '--quality', '95',
+  '--sharpness', '2',
+  '--contrast', '1.3',
+  '--denoise', 'off',
+]
 
 // Only one process can open the camera, so photos are taken one at a time
 let queue: Promise<unknown> = Promise.resolve()
@@ -27,15 +35,15 @@ async function capture(warmupSeconds: number): Promise<Buffer> {
       'rpicam-still',
       [
         '--nopreview',
-        '--width', String(WIDTH),
-        '--height', String(HEIGHT),
+        ...IMAGE_ARGS,
         '--timeout', String(warmupSeconds * 1000),
         '--output', '-',
       ],
       {
         encoding: 'buffer',
         maxBuffer: 20 * 1024 * 1024,
-        timeout: warmupSeconds * 1000 + 20_000,
+        // A full-size JPEG takes a while to encode on a Pi 1
+        timeout: warmupSeconds * 1000 + 40_000,
         killSignal: 'SIGKILL',
       },
     )
