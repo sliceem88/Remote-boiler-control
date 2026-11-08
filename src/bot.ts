@@ -30,7 +30,7 @@ const COMMANDS = [
     description: `${text} (relay ${channel}, ${holdMs / 1000} s)`,
   })),
   { command: 'test', description: 'Pulse every relay in turn: /test run' },
-  { command: 'photo', description: `Take a camera photo, e.g. /photo 5 for dim light (1-${MAX_WARMUP_SECONDS} s warm-up)` },
+  { command: 'photo', description: `Take a camera photo, e.g. /photo 5 for a longer warm-up (1-${MAX_WARMUP_SECONDS} s)` },
   { command: 'temp', description: 'Read boiler temperature' },
   { command: 'relay', description: 'Show relays, or switch one: /relay 1 on' },
 ]

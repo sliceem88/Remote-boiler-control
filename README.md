@@ -9,7 +9,7 @@ Boiler control through raspberry PI GPIO ports and Camera
 | Database | SQLite via `better-sqlite3` (file: `data/boiler.db`) |
 | Telegram bot | [grammY](https://grammy.dev) (long polling, no public URL needed) |
 | Relays (8 channel) | [`opengpio`](https://github.com/ExpeditionExploration/opengpio) (libgpiod 2) |
-| Camera OV5647 | `rpicam-still` CLI (CSI ribbon camera, not GPIO) |
+| Camera OV5647 | `rpicam-still` CLI (CSI ribbon camera, not GPIO), photos rotated with `jpegtran` |
 | Temperature (DS18B20) | Kernel 1-Wire driver, read from `/sys/bus/w1/devices` |
 
 TypeScript runs directly on Node (type stripping, Node >= 22.18), so there is no build step.
@@ -30,7 +30,7 @@ Relay pins and active-low logic are set in `src/hardware/relay.ts`. The boiler s
 2. Install Node 24 and the build tools:
    ```bash
    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-   sudo apt install -y nodejs build-essential python3 libgpiod-dev gpiod
+   sudo apt install -y nodejs build-essential python3 libgpiod-dev gpiod libjpeg-turbo-progs
    ```
 3. Add the 1-Wire line to `/boot/firmware/config.txt`, then reboot:
    ```
@@ -77,8 +77,8 @@ Commands (also shown in Telegram's menu button):
 | `/menu` | Replies "Menu" + photo. Relay 4 (GPIO19), 0.5 s |
 | `/enter` | Replies "Enter" + photo. Same as `/menu`: relay 4 (GPIO19), 0.5 s |
 | `/test` | Shows a warning. `/test run` closes relays 1-8 one after another (1 s each) |
-| `/photo` | Send a camera photo (1600x1200) |
-| `/photo 5` | Same, with a 5 s warm-up so auto exposure settles in dim light (1-10 s) |
+| `/photo` | Send a camera photo (full 2592x1944, sharpened, turned to the left with `jpegtran`) |
+| `/photo 5` | Same, with a 5 s warm-up (1-10 s, default 2 s). Exposure is fixed at 0.12 s / gain 4, so warm-up only lets white balance settle |
 | `/temp` | Read the temperature |
 | `/relay` | Show all relay states |
 | `/relay 3 on` | Switch relay 3 on (or `off`) |
