@@ -1,28 +1,33 @@
-import { Bot, InputFile } from 'grammy'
+import { Bot, type Context, InputFile } from 'grammy'
 import { saveMessage } from './db.ts'
 import { MAX_WARMUP_SECONDS, takePhoto } from './hardware/camera.ts'
 import { getRelayStates, pulseRelay, RELAY_COUNT, setRelay, testRelays } from './hardware/relay.ts'
 import { readTemperature } from './hardware/temperature.ts'
 
+const SHORT_MS = 100
 const TAP_MS = 500
 const HOLD_MS = 2000
 const TEST_PRESS_MS = 1000
 
-// Each command presses a boiler button: the relay closes for holdMs, then opens again.
-// Channels are relay board inputs: 1 = GPIO5, 2 = GPIO6, 3 = GPIO13, 4 = GPIO19
+// Each command presses a boiler button: the relay closes for holdMs, then opens again, then the bot
+// replies with `text` and a photo of the boiler.
+// Channels are relay board inputs: 1 = GPIO5, 2 = GPIO6, 3 = GPIO13, 4 = GPIO19.
+// Channel 3 is one physical button (short press = Back, 2 s hold = Start / Stop), channel 4 is Menu / Enter.
 const BUTTONS = [
-  { command: 'plus', label: 'Plus', channel: 1, holdMs: TAP_MS },
-  { command: 'minus', label: 'Minus', channel: 2, holdMs: TAP_MS },
-  { command: 'start', label: 'Start', channel: 3, holdMs: HOLD_MS },
-  { command: 'down', label: 'Down', channel: 3, holdMs: HOLD_MS },
-  { command: 'menu', label: 'Menu', channel: 4, holdMs: TAP_MS },
+  { command: 'plus', text: 'Plus temperature', channel: 1, holdMs: SHORT_MS },
+  { command: 'minus', text: 'Minus temperature', channel: 2, holdMs: SHORT_MS },
+  { command: 'start', text: 'Start', channel: 3, holdMs: HOLD_MS },
+  { command: 'stop', text: 'Stop', channel: 3, holdMs: HOLD_MS },
+  { command: 'back', text: 'Back', channel: 3, holdMs: SHORT_MS },
+  { command: 'menu', text: 'Menu', channel: 4, holdMs: TAP_MS },
+  { command: 'enter', text: 'Enter', channel: 4, holdMs: TAP_MS },
 ]
 
 const COMMANDS = [
   { command: 'help', description: 'Show available commands' },
-  ...BUTTONS.map(({ command, label, channel, holdMs }) => ({
+  ...BUTTONS.map(({ command, text, channel, holdMs }) => ({
     command,
-    description: `Press ${label} (relay ${channel}, ${holdMs / 1000} s)`,
+    description: `${text} (relay ${channel}, ${holdMs / 1000} s)`,
   })),
   { command: 'test', description: 'Pulse every relay in turn: /test run' },
   { command: 'photo', description: `Take a camera photo, e.g. /photo 5 for dim light (1-${MAX_WARMUP_SECONDS} s warm-up)` },
@@ -37,6 +42,19 @@ const allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '')
   .filter(Boolean)
   .map(Number)
 
+// Never throws, so it can run in the background without crashing the bot
+async function sendStatusPhoto(ctx: Context) {
+  try {
+    await ctx.replyWithChatAction('upload_photo')
+    await ctx.replyWithPhoto(new InputFile(await takePhoto(), 'photo.jpg'))
+  } catch (error) {
+    console.error(error)
+    await ctx
+      .reply(`Photo failed: ${error instanceof Error ? error.message : String(error)}`)
+      .catch((replyError) => console.error('Could not report the error:', replyError))
+  }
+}
+
 export async function startBot(token: string) {
   const bot = new Bot(token)
 
@@ -49,10 +67,12 @@ export async function startBot(token: string) {
 
   bot.command('help', (ctx) => ctx.reply(HELP_TEXT))
 
-  for (const { command, label, channel, holdMs } of BUTTONS) {
+  for (const { command, text, channel, holdMs } of BUTTONS) {
     bot.command(command, async (ctx) => {
       await pulseRelay(channel, holdMs)
-      await ctx.reply(`${label} pressed (relay ${channel}, ${holdMs / 1000} s)`)
+      await ctx.reply(text)
+      // Not awaited: a slow photo must not delay the next button press
+      void sendStatusPhoto(ctx)
     })
   }
 

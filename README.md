@@ -69,11 +69,13 @@ Commands (also shown in Telegram's menu button):
 | Command | What it does |
 | --- | --- |
 | `/help` | List commands |
-| `/plus` | Press the Plus button: relay 1 (GPIO5) closes for 0.5 s |
-| `/minus` | Press Minus: relay 2 (GPIO6), 0.5 s |
-| `/start` | Press Start: relay 3 (GPIO13), held 2 s |
-| `/down` | Press Down: relay 3 (GPIO13), held 2 s |
-| `/menu` | Press Menu: relay 4 (GPIO19), 0.5 s |
+| `/plus` | Replies "Plus temperature" + photo. Relay 1 (GPIO5) closes for 0.1 s |
+| `/minus` | Replies "Minus temperature" + photo. Relay 2 (GPIO6), 0.1 s |
+| `/start` | Replies "Start" + photo. Relay 3 (GPIO13), held 2 s |
+| `/stop` | Replies "Stop" + photo. Relay 3 (GPIO13), held 2 s |
+| `/back` | Replies "Back" + photo. Relay 3 (GPIO13), 0.1 s |
+| `/menu` | Replies "Menu" + photo. Relay 4 (GPIO19), 0.5 s |
+| `/enter` | Replies "Enter" + photo. Same as `/menu`: relay 4 (GPIO19), 0.5 s |
 | `/test` | Shows a warning. `/test run` closes relays 1-8 one after another (1 s each) |
 | `/photo` | Send a camera photo (1600x1200) |
 | `/photo 5` | Same, with a 5 s warm-up so auto exposure settles in dim light (1-10 s) |
