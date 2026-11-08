@@ -1,12 +1,31 @@
 import { Bot, InputFile } from 'grammy'
 import { saveMessage } from './db.ts'
-import { takePhoto } from './hardware/camera.ts'
-import { getRelayStates, RELAY_COUNT, setRelay } from './hardware/relay.ts'
+import { MAX_WARMUP_SECONDS, takePhoto } from './hardware/camera.ts'
+import { getRelayStates, pulseRelay, RELAY_COUNT, setRelay, testRelays } from './hardware/relay.ts'
 import { readTemperature } from './hardware/temperature.ts'
+
+const TAP_MS = 500
+const HOLD_MS = 2000
+const TEST_PRESS_MS = 1000
+
+// Each command presses a boiler button: the relay closes for holdMs, then opens again.
+// Channels are relay board inputs: 1 = GPIO5, 2 = GPIO6, 3 = GPIO13, 4 = GPIO19
+const BUTTONS = [
+  { command: 'plus', label: 'Plus', channel: 1, holdMs: TAP_MS },
+  { command: 'minus', label: 'Minus', channel: 2, holdMs: TAP_MS },
+  { command: 'start', label: 'Start', channel: 3, holdMs: HOLD_MS },
+  { command: 'down', label: 'Down', channel: 3, holdMs: HOLD_MS },
+  { command: 'menu', label: 'Menu', channel: 4, holdMs: TAP_MS },
+]
 
 const COMMANDS = [
   { command: 'help', description: 'Show available commands' },
-  { command: 'photo', description: 'Take a camera photo' },
+  ...BUTTONS.map(({ command, label, channel, holdMs }) => ({
+    command,
+    description: `Press ${label} (relay ${channel}, ${holdMs / 1000} s)`,
+  })),
+  { command: 'test', description: 'Pulse every relay in turn: /test run' },
+  { command: 'photo', description: `Take a camera photo, e.g. /photo 5 for dim light (1-${MAX_WARMUP_SECONDS} s warm-up)` },
   { command: 'temp', description: 'Read boiler temperature' },
   { command: 'relay', description: 'Show relays, or switch one: /relay 1 on' },
 ]
@@ -24,13 +43,39 @@ export async function startBot(token: string) {
   // The bot is public, so only listed users may control the boiler
   bot.use(async (ctx, next) => {
     if (ctx.from && allowedUserIds.includes(ctx.from.id)) return next()
-    await ctx.reply(`Access denied. Your Telegram user id is ${ctx.from?.id}`)
+    // Only answer in private chats: channels and groups are ignored silently
+    if (ctx.chat?.type === 'private') await ctx.reply(`Access denied. Your Telegram user id is ${ctx.from?.id}`)
   })
 
-  bot.command(['start', 'help'], (ctx) => ctx.reply(HELP_TEXT))
+  bot.command('help', (ctx) => ctx.reply(HELP_TEXT))
+
+  for (const { command, label, channel, holdMs } of BUTTONS) {
+    bot.command(command, async (ctx) => {
+      await pulseRelay(channel, holdMs)
+      await ctx.reply(`${label} pressed (relay ${channel}, ${holdMs / 1000} s)`)
+    })
+  }
+
+  // Closes every relay, so anything wired to the boiler buttons gets pressed: needs an explicit "run"
+  bot.command('test', async (ctx) => {
+    if (ctx.match.trim() !== 'run') {
+      return ctx.reply(`This closes all ${RELAY_COUNT} relays in turn, so every boiler button wired to them is pressed. Send /test run to go ahead.`)
+    }
+    await ctx.reply(`Testing ${RELAY_COUNT} relays, one at a time`)
+    await testRelays(TEST_PRESS_MS, async (channel) => {
+      await ctx.reply(`Relay ${channel}`)
+    })
+    await ctx.reply('Test finished')
+  })
 
   bot.command('photo', async (ctx) => {
-    await ctx.replyWithPhoto(new InputFile(await takePhoto(), 'photo.jpg'))
+    const arg = ctx.match.trim()
+    const warmupSeconds = arg ? Number(arg) : undefined
+    if (warmupSeconds !== undefined && !(warmupSeconds >= 1 && warmupSeconds <= MAX_WARMUP_SECONDS)) {
+      return ctx.reply(`Usage: /photo [warm-up seconds, 1-${MAX_WARMUP_SECONDS}]`)
+    }
+    await ctx.replyWithChatAction('upload_photo')
+    await ctx.replyWithPhoto(new InputFile(await takePhoto({ warmupSeconds }), 'photo.jpg'))
   })
 
   bot.command('temp', async (ctx) => {
@@ -56,9 +101,16 @@ export async function startBot(token: string) {
 
   bot.catch(async ({ ctx, error }) => {
     console.error(error)
-    await ctx.reply(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    // If this reply fails too (e.g. the bot was kicked from the chat), only log it: crashing would loop on the same update
+    await ctx
+      .reply(`Error: ${error instanceof Error ? error.message : String(error)}`)
+      .catch((replyError) => console.error('Could not report the error:', replyError))
   })
 
   await bot.api.setMyCommands(COMMANDS)
-  await bot.start({ onStart: (me) => console.log(`Telegram bot @${me.username} started`) })
+  // Commands sent while the Pi was off are dropped, so a queued /start or /plus never fires at boot
+  await bot.start({
+    drop_pending_updates: true,
+    onStart: (me) => console.log(`Telegram bot @${me.username} started`),
+  })
 }

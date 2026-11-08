@@ -1,19 +1,20 @@
-import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+// Built into Node (22.5+), so there is no native module to compile on the Pi
+import { DatabaseSync } from 'node:sqlite'
 
 const dataDir = join(import.meta.dirname, '..', 'data')
 mkdirSync(dataDir, { recursive: true })
 
-export const db = new Database(join(dataDir, 'boiler.db'))
-db.pragma('journal_mode = WAL')
+export const db = new DatabaseSync(join(dataDir, 'boiler.db'))
+db.exec('PRAGMA journal_mode = WAL')
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER NOT NULL,
-    text TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        chat_id INTEGER NOT NULL,
+                                        text TEXT NOT NULL,
+                                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )
 `)
 

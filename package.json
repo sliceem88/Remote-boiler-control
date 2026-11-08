@@ -12,13 +12,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "better-sqlite3": "^13.0.3",
     "grammy": "^1.46.0",
     "hono": "^4.13.13",
     "opengpio": "^2.0.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.5",
     "typescript": "^7.0.2"
   }

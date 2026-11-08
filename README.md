@@ -18,7 +18,7 @@ TypeScript runs directly on Node (type stripping, Node >= 22.18), so there is no
 
 | Device | Pin |
 | --- | --- |
-| Relay IN1..IN8 | GPIO5, GPIO6, GPIO13, GPIO16, GPIO19, GPIO20, GPIO21, GPIO26 |
+| Relay IN1..IN8 | GPIO5, GPIO6, GPIO13, GPIO19, GPIO26, GPIO16, GPIO20, GPIO21 (physical pins 29, 31, 33, 35, 37, 36, 38, 40) |
 | DS18B20 data | GPIO4 (pin 7), with a 4.7 kΩ resistor between data and 3.3V |
 | Camera | CSI camera connector |
 
@@ -69,7 +69,14 @@ Commands (also shown in Telegram's menu button):
 | Command | What it does |
 | --- | --- |
 | `/help` | List commands |
-| `/photo` | Send a camera photo |
+| `/plus` | Press the Plus button: relay 1 (GPIO5) closes for 0.5 s |
+| `/minus` | Press Minus: relay 2 (GPIO6), 0.5 s |
+| `/start` | Press Start: relay 3 (GPIO13), held 2 s |
+| `/down` | Press Down: relay 3 (GPIO13), held 2 s |
+| `/menu` | Press Menu: relay 4 (GPIO19), 0.5 s |
+| `/test` | Shows a warning. `/test run` closes relays 1-8 one after another (1 s each) |
+| `/photo` | Send a camera photo (1600x1200) |
+| `/photo 5` | Same, with a 5 s warm-up so auto exposure settles in dim light (1-10 s) |
 | `/temp` | Read the temperature |
 | `/relay` | Show all relay states |
 | `/relay 3 on` | Switch relay 3 on (or `off`) |
